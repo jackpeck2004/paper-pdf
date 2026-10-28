@@ -5,7 +5,8 @@ import UniformTypeIdentifiers
 import PaperCore
 
 final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
-    unowned let paper: PaperDocument
+    // Closing windows can outlive their NSDocument during PDFKit layout.
+    private(set) weak var paper: PaperDocument?
     let pdf = CanvasView()
     let sidebar = NSView()
     let inspector = NSStackView()
@@ -62,6 +63,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
     deinit { observers.forEach(NotificationCenter.default.removeObserver) }
     override func loadView() {
         view = NSView()
+        guard let paper else { return }
         view.wantsLayer = true
         buildSidebar(); buildInspector(); buildMarkupBar()
         let sideController = NSViewController(); sideController.view = sidebar
@@ -299,6 +301,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         if let editor = pdf.inlineEditor { pdf.inlineSize = chosenSize; editor.text.font = .systemFont(ofSize:chosenSize*pdf.scaleFactor) }
     }
     func display(_ revision: PDFRevision) {
+        guard let paper else { return }
         guard revision.number >= visibleRevision else { return }
         guard let document = PDFDocument(data:revision.data) else { paper.presentError(PDFError("PDFKit could not display the committed PDF.")); return }
         isRefreshing = true; defer { isRefreshing = false }
@@ -335,6 +338,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
     var chosenSize: CGFloat { min(500,max(1,CGFloat(fontSize.doubleValue == 0 ? 14 : fontSize.doubleValue))) }
     func index(_ page: PDFPage) -> Int { pdf.document?.index(for:page) ?? 0 }
     func updateStatus() {
+        guard let paper else { return }
         pageField.integerValue = currentPageIndex+1; pageCountLabel.stringValue = "of \(pdf.document?.pageCount ?? 0)"
         status.stringValue = "\(Int(pdf.scaleFactor*100))%" + (paper.store.permitsEditing ? "" : "   ·   Read only")
 
@@ -413,6 +417,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         return info.draggingSource as? NSTableView === table ? .move : .copy
     }
     func tableView(_ tableView: NSTableView,acceptDrop info: NSDraggingInfo,row: Int,dropOperation: NSTableView.DropOperation) -> Bool {
+        guard let paper else { return false }
         if info.draggingSource as? NSTableView === table {
             let source = info.draggingPasteboard.pasteboardItems?.compactMap { $0.string(forType:.init("org.paperpdf.page")).flatMap(Int.init) }.sorted() ?? []
             guard !source.isEmpty else { return false }
@@ -449,6 +454,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         }
     }
     @objc func saveComment(_ sender: Any?) {
+        guard let paper else { return }
         if let link = selectedLink {
             let uri = comment.string
             guard validLink(uri) else { return }
@@ -459,6 +465,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         paper.perform("Edit Comment") { try $0.annotation(page:selectedAnnotation.page,index:selectedAnnotation.index,contents:contents) }
     }
     @objc func deleteAnnotation(_ sender: Any?) {
+        guard let paper else { return }
         if let link = selectedLink {
             paper.perform("Delete Link") { try $0.editLink(page:link.page,index:link.index,bounds:link.bounds,uri:"",remove:true) }; return
         }
@@ -472,6 +479,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         for (field,value) in zip(geometryFields,[bounds.minX,bounds.minY,bounds.width,bounds.height]) { field.doubleValue = Double(value) }
     }
     @objc func applyGeometry(_ sender: Any?) {
+        guard let paper else { return }
         let v = geometryFields.map(\.doubleValue)
         guard v.allSatisfy(\.isFinite), v[2]>0, v[3]>0 else { return }
         let bounds = CGRect(x:v[0],y:v[1],width:v[2],height:v[3])

@@ -28,6 +28,7 @@ extension EditorController {
         }
     }
     func markup(_ tool: EditorTool,contents: String = "") {
+        guard let paper else { return }
         guard let selection = pdf.currentSelection, let kind = tool.annotationKind else { return }
         let selections = selection.selectionsByLine()
         let data = selection.pages.map { page -> (Int,[CGRect]) in
@@ -44,6 +45,7 @@ extension EditorController {
         }
     }
     func gesture(_ tool: EditorTool,page: PDFPage,bounds: CGRect,points: [CGPoint]) {
+        guard let paper else { return }
         let pageIndex = index(page), g = PageGeometry(page:page)
         let clipped = bounds.intersection(page.bounds(for:.cropBox))
         let r = g.engineRect(clipped.isNull ? bounds : clipped)
@@ -59,13 +61,13 @@ extension EditorController {
             let noteBounds = CGRect(x:position.x,y:position.y,width:24,height:24)
             let revision = visibleRevision
             pdf.beginTextEditing(on:page,bounds:CGRect(origin:bounds.origin,size:CGSize(width:220,height:80)),value:"",size:13,color:.labelColor,multiline:true) { [weak self] value in
-                self?.paper.perform("Add Note",expectedRevision:revision) { try $0.annotate(page:pageIndex,kind:"Text",bounds:noteBounds,contents:value,color:color) }
+                self?.paper?.perform("Add Note",expectedRevision:revision) { try $0.annotate(page:pageIndex,kind:"Text",bounds:noteBounds,contents:value,color:color) }
             }
         case .text:
             let revision = visibleRevision
             pdf.beginTextEditing(on:page,bounds:bounds,value:"",size:size,color:self.color.color,multiline:true) { [weak self] value in
                 guard let self else { return }
-                self.paper.perform("Add Text",expectedRevision:revision) { try $0.annotate(page:pageIndex,kind:"FreeText",bounds:r,contents:value,color:self.rgbColor,size:self.chosenSize) }
+                self.paper?.perform("Add Text",expectedRevision:revision) { try $0.annotate(page:pageIndex,kind:"FreeText",bounds:r,contents:value,color:self.rgbColor,size:self.chosenSize) }
             }
         case .image: placeImage(page:pageIndex,bounds:r)
         case .signature: placeSignature(page:pageIndex,bounds:r)
@@ -95,6 +97,7 @@ extension EditorController {
         correct(page:page,at:CGPoint(x:r.midX,y:r.midY))
     }
     func correct(page: PDFPage,at point: CGPoint) {
+        guard let paper else { return }
         do {
             let pageIndex = index(page)
             let lines = try paper.store.read { try $0.lines(page:pageIndex) }
@@ -112,11 +115,12 @@ extension EditorController {
             pdf.beginTextEditing(on:page,bounds:pdfBounds,value:line.text,size:line.size,color:color.color,multiline:false) { [weak self] value in
                 guard let self else { return }
                 let font = self.fontPicker.indexOfSelectedItem == 0 ? "" : self.fontPicker.titleOfSelectedItem ?? ""
-                self.paper.perform("Correct Text",expectedRevision:revision) { try $0.replaceLine(page:pageIndex,index:line.index,text:value,font:font,size:self.chosenSize,color:self.rgbColor) }
+                self.paper?.perform("Correct Text",expectedRevision:revision) { try $0.replaceLine(page:pageIndex,index:line.index,text:value,font:font,size:self.chosenSize,color:self.rgbColor) }
             }
         } catch { paper.presentError(error) }
     }
     func editField(page: PDFPage,annotation: PDFAnnotation) {
+        guard let paper else { return }
         let widgets = page.annotations.filter { $0.type == "Widget" }
         guard let i = widgets.firstIndex(of:annotation) else { return }
         let p = index(page), revision = visibleRevision
@@ -125,7 +129,7 @@ extension EditorController {
             paper.perform("Fill Form",expectedRevision:revision) { try $0.form(page:p,index:i,value:value) }
         } else {
             pdf.beginTextEditing(on:page,bounds:annotation.bounds,value:annotation.widgetStringValue ?? "",size:annotation.font?.pointSize ?? 13,color:.labelColor,multiline:annotation.isMultiline) { [weak self] value in
-                self?.paper.perform("Fill Form",expectedRevision:revision) { try $0.form(page:p,index:i,value:value) }
+                self?.paper?.perform("Fill Form",expectedRevision:revision) { try $0.form(page:p,index:i,value:value) }
             }
         }
     }
@@ -138,6 +142,7 @@ extension EditorController {
         if a.runModal() == .alertFirstButtonReturn { editField(page:page,annotation:fields[picker.indexOfSelectedItem]) }
     }
     @objc func recognizeText(_ sender: Any?) {
+        guard let paper else { return }
         guard !ocrRunning else { return }
         do {
             let snapshot = try paper.store.snapshot(), pages = selectedPages
@@ -145,32 +150,43 @@ extension EditorController {
             DispatchQueue.global(qos:.userInitiated).async { [weak self] in
                 let result = Result { try OCRService.recognize(data:snapshot.data,pages:pages) }
                 DispatchQueue.main.async {
-                    guard let self else { return }; self.ocrRunning = false; self.progress.stopAnimation(nil)
+                    guard let self, self.paper != nil else { return }; self.ocrRunning = false; self.progress.stopAnimation(nil)
                     switch result {
                     case .success(let lines):
                         guard !lines.isEmpty else { self.alert("No New Text", "Selected pages already have text, or no text was recognized."); self.updateStatus(); return }
-                        self.paper.perform("Recognize Text",expectedRevision:snapshot.number) { engine in for l in lines { try engine.ocr(page:l.page,bounds:l.bounds,text:l.text) } }
-                    case .failure(let error): self.paper.presentError(error)
+                        self.paper?.perform("Recognize Text",expectedRevision:snapshot.number) { engine in for l in lines { try engine.ocr(page:l.page,bounds:l.bounds,text:l.text) } }
+                    case .failure(let error): self.paper?.presentError(error)
                     }
                 }
             }
         } catch { paper.presentError(error) }
     }
-    @objc func rotatePage(_ sender: Any?) { let pages = selectedPages; paper.perform("Rotate Pages") { e in for p in pages { try e.rotate(page:p) } } }
-    @objc func insertBlank(_ sender: Any?) { let at = currentPageIndex+1; paper.perform("Insert Blank Page") { try $0.insertBlank(at:at) } }
+    @objc func rotatePage(_ sender: Any?) {
+        guard let paper else { return }
+        let pages = selectedPages
+        paper.perform("Rotate Pages") { e in for p in pages { try e.rotate(page:p) } }
+    }
+    @objc func insertBlank(_ sender: Any?) {
+        guard let paper else { return }
+        let at = currentPageIndex+1
+        paper.perform("Insert Blank Page") { try $0.insertBlank(at:at) }
+    }
     @objc func deletePages(_ sender: Any?) {
+        guard let paper else { return }
         let selected = Set(selectedPages), count = pdf.document?.pageCount ?? 0
         let keep = Array(0..<count).filter { !selected.contains($0) }
         guard !keep.isEmpty else { alert("Keep One Page", "A PDF must contain at least one page."); return }
         paper.perform("Delete Pages") { try $0.reorder(keep) }
     }
     @objc func duplicatePages(_ sender: Any?) {
+        guard let paper else { return }
         let pages = selectedPages
         paper.perform("Duplicate Pages") { try $0.duplicate(pages:pages) }
     }
     @objc func moveEarlier(_ sender: Any?) { movePage(delta:-1) }
     @objc func moveLater(_ sender: Any?) { movePage(delta:1) }
     private func movePage(delta: Int) {
+        guard let paper else { return }
         var order = Array(0..<(pdf.document?.pageCount ?? 0)); let p = currentPageIndex, other = p+delta
         guard order.indices.contains(other) else { return }; order.swapAt(p,other)
         paper.perform("Move Page") { try $0.reorder(order) }
@@ -181,6 +197,7 @@ extension EditorController {
         if panel.runModal() == .OK { insert(urls:panel.urls) }
     }
     func insert(urls: [URL],at position: Int? = nil) {
+        guard let paper else { return }
         guard !urls.isEmpty else { return }
         do {
             let documents = try urls.map { url -> Data in
@@ -199,6 +216,7 @@ extension EditorController {
         } catch { paper.presentError(error) }
     }
     @objc func extractPages(_ sender: Any?) {
+        guard let paper else { return }
         do {
             let pages = selectedPages
             let data = try paper.store.read { try $0.extract(pages:pages) }
@@ -207,10 +225,12 @@ extension EditorController {
         } catch { paper.presentError(error) }
     }
     @objc func addBookmark(_ sender: Any?) {
+        guard let paper else { return }
         guard let title = prompt("Add Bookmark",value:"Page \(currentPageIndex+1)"), !title.isEmpty else { return }
         let page = currentPageIndex; paper.perform("Add Bookmark") { try $0.bookmark(page:page,title:title) }
     }
     @objc func removeBookmark(_ sender: Any?) {
+        guard let paper else { return }
         guard sidebarMode.rawValue == 1, outline.selectedRow >= 0 else { return }
         // Nested bookmarks are preserved; this first release manages root entries.
         guard let root = selectedRootBookmark() else { alert("Select a Top-Level Bookmark", "Nested bookmarks are preserved. Select a top-level entry to remove its subtree."); return }
@@ -218,6 +238,7 @@ extension EditorController {
     }
     func selectedRootBookmark() -> Int? { outlineRootIndex(row:table.selectedRow) }
     func editImage(page: PDFPage, at point: CGPoint) {
+        guard let paper else { return }
         do {
             let pageIndex = index(page)
             guard let image = try paper.store.read({ try $0.images(page:pageIndex) }).reversed().first(where: { $0.bounds.contains(point) }) else { throw PDFError("No image was found here. Placed images and signatures can be selected with the Select tool.") }
@@ -230,16 +251,19 @@ extension EditorController {
         } catch { paper.presentError(error) }
     }
     @objc func replaceSelectedImage(_ sender: Any?) {
+        guard let paper else { return }
         guard let image = selectedImage else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.png,.jpeg,.tiff,.heic]
         guard panel.runModal() == .OK, let url = panel.url, let selected = NSImage(contentsOf:url), let tiff = selected.tiffRepresentation, let bitmap = NSBitmapImageRep(data:tiff), let data = bitmap.representation(using:.png,properties:[:]) else { return }
         paper.perform("Replace Image") { try $0.editImage(page:image.page,index:image.index,bounds:image.bounds,replacement:data) }
     }
     @objc func deleteSelectedImage(_ sender: Any?) {
+        guard let paper else { return }
         guard let image = selectedImage else { return }
         paper.perform("Delete Image") { try $0.editImage(page:image.page,index:image.index,bounds:image.bounds,remove:true) }
     }
     func placeImage(page: Int,bounds: CGRect) {
+        guard let paper else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.png,.jpeg,.tiff,.heic]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
@@ -248,6 +272,7 @@ extension EditorController {
         } catch { paper.presentError(error) }
     }
     func placeSignature(page: Int,bounds: CGRect) {
+        guard let paper else { return }
         guard let data = SignaturePanel.choose() else { return }
         paper.perform("Place Signature") { try $0.image(page:page,bounds:bounds,data:data) }
     }
@@ -255,10 +280,11 @@ extension EditorController {
     func beginAnnotationTextEditing(page: PDFPage,annotation: PDFAnnotation,index annotationIndex: Int) {
         let pageIndex = index(page), revision = visibleRevision
         pdf.beginTextEditing(on:page,bounds:annotation.bounds,value:annotation.contents ?? "",size:annotation.font?.pointSize ?? 14,color:annotation.fontColor ?? .labelColor,multiline:true) { [weak self] value in
-            self?.paper.perform("Edit Text",expectedRevision:revision) { try $0.annotation(page:pageIndex,index:annotationIndex,contents:value) }
+            self?.paper?.perform("Edit Text",expectedRevision:revision) { try $0.annotation(page:pageIndex,index:annotationIndex,contents:value) }
         }
     }
     @objc func exportDocument(_ sender: Any?) {
+        guard let paper else { return }
         let panel = NSSavePanel(); panel.nameFieldStringValue = "\(paper.displayName.replacingOccurrences(of:".pdf",with:"")) Copy.pdf"; panel.allowedContentTypes = [.pdf,.png,.plainText]
         let format = NSPopUpButton(); format.addItems(withTitles:["PDF · editable annotations","PDF · flattened annotations and forms","PDF · compressed, images at 150 dpi","PNG · current page","Text · annotation summary"])
         let password = NSSecureTextField(); password.placeholderString = "Optional password for PDF output"
@@ -287,10 +313,12 @@ extension EditorController {
         } catch { paper.presentError(error) }
     }
     @objc func printPDF(_ sender: Any?) {
+        guard let paper else { return }
         guard let op = pdf.document?.printOperation(for:paper.printInfo,scalingMode:.pageScaleDownToFit,autoRotate:true) else { return }
         op.run()
     }
     @objc func shareDocument(_ sender: Any?) {
+        guard let paper else { return }
         paper.save(withDelegate:self,didSave:#selector(didSaveForSharing(_:didSave:contextInfo:)),contextInfo:nil)
     }
     @objc func didSaveForSharing(_ document: NSDocument,didSave: Bool,contextInfo: UnsafeMutableRawPointer?) {

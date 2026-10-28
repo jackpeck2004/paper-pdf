@@ -28,6 +28,7 @@ extension EditorController {
         sidebarMode = mode; sidebarItem.isCollapsed = false; filter.stringValue = ""; reloadSidebar()
     }
     func commitThumbnailOrder() {
+        guard let paper else { return }
         guard !isRefreshing, let document = pdf.document else { return }
         let order = (0..<document.pageCount).compactMap { document.page(at:$0).flatMap { pageIdentityToIndex[ObjectIdentifier($0)] } }
         guard order.count == pageIdentityToIndex.count, Set(order).count == order.count else {

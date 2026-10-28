@@ -1,6 +1,6 @@
 cask "paper-pdf" do
-  version "0.2.2"
-  sha256 "900bfc8561fe61946d0a2467efc6e7e1f94cf9217783e4cdef7cc24fdeb12b8b"
+  version "0.2.3"
+  sha256 "8d76c4bca37f11a151091cac369be8c45f9dad8e4ebf40abef43fd650f53c4f3"
 
   url "https://github.com/jackpeck2004/paper-pdf/releases/download/v#{version}/Paper-#{version}-universal.zip",
       verified: "github.com/jackpeck2004/paper-pdf/"

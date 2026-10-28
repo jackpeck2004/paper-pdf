@@ -38,3 +38,10 @@ Not verified: execution on Intel hardware or macOS 14, broad real-world PDF comp
 - Replaced the constrained title/page stack with native, separate outline columns: a flexible chapter-title column and a fixed trailing page-number column.
 - Made the title column track the scroll viewport during sidebar resizing, left-aligned the outline caption, and supplied full-title tooltips.
 - All 30 regression checks pass, including explicit column-sizing checks at narrow and wide sidebar widths.
+
+## Document lifetime crash — 28 October 2026
+
+- Reproduced the supplied 0.2.1 crash on the 0.2.2 source: a retained viewer receiving PDFKit scale/page notifications after its document was destroyed aborted on an unowned reference.
+- Replaced the document reference with weak ownership. Document-dependent actions acquire a local strong reference or return; delayed inline-editor and background callbacks tolerate a missing document.
+- Added a native regression that releases the document while retaining its viewer, posts scale/page notifications, resizes the PDF canvas, invokes page actions, and commits an existing inline text editor. The weak-document assertion also checks that the fix does not retain the document.
+- All 31 native regression checks passed, including on-device OCR, with the compatible macOS 26.5 SDK.

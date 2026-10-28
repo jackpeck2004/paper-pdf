@@ -17,6 +17,7 @@ final class ChapterNode {
 
 extension EditorController: NSOutlineViewDataSource, NSOutlineViewDelegate {
     func loadBookContents() {
+        guard let paper else { return }
         guard let document = pdf.document else { return }
         let embedded = BookOutline.embedded(in:document)
         if !embedded.isEmpty {
@@ -33,7 +34,7 @@ extension EditorController: NSOutlineViewDataSource, NSOutlineViewDelegate {
             DispatchQueue.global(qos:.userInitiated).async { [weak self] in
                 let result = Result { try BookOutline.extract(data:snapshot.data) }
                 DispatchQueue.main.async {
-                    guard let self, self.visibleRevision == snapshot.number else { return }
+                    guard let self, self.paper != nil, self.visibleRevision == snapshot.number else { return }
                     self.chapterRequest = nil; self.chapterRevision = snapshot.number
                     switch result {
                     case .success(let contents): self.chapters = contents.chapters.map(ChapterNode.init); self.chapterSource = contents.source

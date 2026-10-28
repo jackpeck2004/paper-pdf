@@ -3,6 +3,31 @@ import PDFKit
 import PaperCore
 
 final class DocumentTests: XCTestCase {
+    func testViewerNotificationsAfterDocumentRelease() throws {
+        weak var releasedDocument: PaperDocument?
+        let controller: EditorController = try autoreleasepool {
+            let document = PaperDocument()
+            releasedDocument = document
+            try document.read(from:EngineTests.fixture(),ofType:"com.adobe.pdf")
+            let controller = EditorController(document:document)
+            controller.loadViewIfNeeded()
+            let page = try XCTUnwrap(controller.pdf.document?.page(at:0))
+            controller.gesture(.text,page:page,bounds:CGRect(x:40,y:40,width:180,height:24),points:[])
+            XCTAssertTrue(controller.pdf.inlineEditor != nil)
+            return controller
+        }
+        XCTAssertTrue(releasedDocument == nil)
+        // AppKit can retain the content controller while a closing window lays
+        // out. PDFKit still posts page/scale notifications during that layout.
+        NotificationCenter.default.post(name:.PDFViewScaleChanged,object:controller.pdf)
+        NotificationCenter.default.post(name:.PDFViewPageChanged,object:controller.pdf)
+        controller.pdf.setFrameSize(NSSize(width:700,height:500))
+        controller.updateStatus()
+        controller.commitThumbnailOrder()
+        controller.rotatePage(nil)
+        controller.pdf.inlineEditor?.commit()
+        XCTAssertTrue(controller.pdf.inlineEditor == nil)
+    }
     func testNativeWindowCommandsAndUndoRedo() throws {
         let document = PaperDocument()
         try document.read(from:EngineTests.fixture(),ofType:"com.adobe.pdf")

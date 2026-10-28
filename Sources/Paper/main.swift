@@ -19,7 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let credits = NSAttributedString(string:"Paper original source: MIT\nIncludes MuPDF under AGPL v3.\nAll document processing stays on your Mac.",attributes:[.font:NSFont.systemFont(ofSize:12),.foregroundColor:NSColor.secondaryLabelColor])
         NSApp.orderFrontStandardAboutPanel(options:[
             .applicationName:"Paper",
-            .applicationVersion:Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "0.2.2",
+            .applicationVersion:Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "0.2.3",
             .version:Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "5",
             .credits:credits
         ])

@@ -38,6 +38,7 @@ for (name,test) in bookCases {
 }
 let documentTests = DocumentTests()
 let nativeCases: [(String,() throws -> Void)] = [
+    ("viewer notifications after document release",documentTests.testViewerNotificationsAfterDocumentRelease),
     ("native window, controller actions, undo and redo",documentTests.testNativeWindowCommandsAndUndoRedo),
     ("inline editing and icon toolbar",documentTests.testInlineTextEditingAndIconToolbar),
     ("hierarchical chapter navigation",documentTests.testOutlineHierarchyNavigatesToChapter),
