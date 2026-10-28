@@ -35,13 +35,13 @@ enum EditorTool: String, CaseIterable {
         case .select: return "Select text to copy or review. Click an annotation to inspect it."
         case .highlight, .underline, .strike: return "Select text. The selected markup is applied when you release."
         case .note: return "Click the page to leave a note."
-        case .text: return "Drag a text box, then enter its contents."
         case .correct: return "Click a line to correct its text. Complex or overlapping lines are protected."
         case .editImage: return "Click an existing image to move, resize, replace, or delete it."
         case .image: return "Drag an area, then choose an image."
         case .signature: return "Drag an area to place a drawn or imported visual signature."
         case .crop: return "Drag the visible page area to keep. Cropping hides content; use Redact to remove it."
         case .redact: return "Drag an area to permanently remove content from saved output."
+        case .text: return "Click to type, or drag a text area. Apply with ⌘Return; click existing text boxes with Select to edit."
         case .link: return "Drag a link area, then enter an HTTPS URL or #page=2 destination."
         case .form: return "Click a standard form field to change its value."
         default: return "Drag on a page to add \(rawValue.lowercased())."
@@ -133,7 +133,7 @@ final class CanvasView: PDFView {
             r = CGRect(x:xs.min()!,y:ys.min()!,width:xs.max()!-xs.min()!,height:ys.max()!-ys.min()!)
         } else { r = CGRect(x:min(a.x,b.x),y:min(a.y,b.y),width:abs(a.x-b.x),height:abs(a.y-b.y)) }
         self.start = nil; gesturePage = nil; dragRect = nil; trail = []; needsDisplay = true
-        if (r.width > 2 && r.height > 2) || (tool == .ink && points.count > 1) || (tool == .arrow && (r.width > 2 || r.height > 2)) { onGesture?(tool,page,r,points) }
+        if tool == .text || (r.width > 2 && r.height > 2) || (tool == .ink && points.count > 1) || (tool == .arrow && (r.width > 2 || r.height > 2)) { onGesture?(tool,page,r,points) }
     }
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()

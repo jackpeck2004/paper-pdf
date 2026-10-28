@@ -65,9 +65,18 @@ extension EditorController {
             }
         case .text:
             let revision = visibleRevision
-            pdf.beginTextEditing(on:page,bounds:bounds,value:"",size:size,color:self.color.color,multiline:true) { [weak self] value in
-                guard let self else { return }
-                self.paper?.perform("Add Text",expectedRevision:revision) { try $0.annotate(page:pageIndex,kind:"FreeText",bounds:r,contents:value,color:self.rgbColor,size:self.chosenSize) }
+            // A click starts a useful text area; a drag chooses its width.
+            let pageBounds = page.bounds(for:.cropBox)
+            let width = min(bounds.width > 2 ? bounds.width : 220,pageBounds.width)
+            let height = min(max(bounds.height,size*1.5+8),pageBounds.height)
+            let textBounds = CGRect(x:max(pageBounds.minX,min(bounds.minX,pageBounds.maxX-width)),y:max(pageBounds.minY,min(bounds.maxY-height,pageBounds.maxY-height)),width:width,height:height)
+            pdf.beginTextEditing(on:page,bounds:textBounds,value:"",size:size,color:self.color.color,multiline:true) { [weak self] value in
+                guard let self, !value.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else { return }
+                let font = NSFont(name:"Helvetica",size:self.chosenSize) ?? .systemFont(ofSize:self.chosenSize)
+                let measured = (value as NSString).boundingRect(with:NSSize(width:max(1,textBounds.width-4),height:.greatestFiniteMagnitude),options:[.usesLineFragmentOrigin,.usesFontLeading],attributes:[.font:font])
+                let height = min(max(textBounds.height,ceil(measured.height)+8),textBounds.maxY-pageBounds.minY)
+                let fitted = CGRect(x:textBounds.minX,y:textBounds.maxY-height,width:textBounds.width,height:height)
+                self.paper?.perform("Add Text",expectedRevision:revision) { try $0.annotate(page:pageIndex,kind:"FreeText",bounds:g.engineRect(fitted),contents:value,color:self.rgbColor,size:self.chosenSize) }
             }
         case .image: placeImage(page:pageIndex,bounds:r)
         case .signature: placeSignature(page:pageIndex,bounds:r)

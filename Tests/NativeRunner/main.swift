@@ -5,6 +5,7 @@ let cases: [(String,(EngineTests) -> () throws -> Void)] = [
     ("text replacement",EngineTests.testTextReplacementRemovesOriginalAndKeepsOtherText),
     ("atomic failures",EngineTests.testFailureIsAtomicAndStaleWorkRejected),
     ("annotation round trips and undo",EngineTests.testAnnotationsRoundTripAndUndoSnapshots),
+    ("transparent text-box rendering",EngineTests.testFreeTextRendersLettersWithoutColoredRectangle),
     ("secure redaction",EngineTests.testRedactionAndNonIncrementalExport),
     ("encrypted and flattened export",EngineTests.testEncryptedAndFlattenedExports),
     ("page organization",EngineTests.testPagesBookmarksLinksAndExtraction),
@@ -40,6 +41,7 @@ let documentTests = DocumentTests()
 let nativeCases: [(String,() throws -> Void)] = [
     ("viewer notifications after document release",documentTests.testViewerNotificationsAfterDocumentRelease),
     ("native window, controller actions, undo and redo",documentTests.testNativeWindowCommandsAndUndoRedo),
+    ("click-to-type and reedit text boxes",documentTests.testClickToTypeTextBoxAndReedit),
     ("inline editing and icon toolbar",documentTests.testInlineTextEditingAndIconToolbar),
     ("hierarchical chapter navigation",documentTests.testOutlineHierarchyNavigatesToChapter),
     ("view-mode keyboard dispatch",documentTests.testReaderMenuShortcutsDispatchToAllViewModes),

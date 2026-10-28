@@ -75,6 +75,29 @@ final class EngineTests: XCTestCase {
         _ = try store.transact { try $0.annotation(page:0,index:0,contents:"Updated") }
         XCTAssertTrue(PDFDocument(data:try store.snapshot().data)?.page(at:0)?.annotations.contains { $0.contents == "Updated" } == true)
     }
+    func testFreeTextRendersLettersWithoutColoredRectangle() throws {
+        let engine = try PDFEngine(data:Self.fixture())
+        try engine.annotate(page:0,kind:"FreeText",bounds:CGRect(x:50,y:250,width:220,height:70),contents:"Visible text",color:0xCC2200,size:18)
+        for flatten in [false,true] {
+            let doc = try XCTUnwrap(PDFDocument(data:engine.export(flatten:flatten)))
+            let page = try XCTUnwrap(doc.page(at:0))
+            let image = page.thumbnail(of:CGSize(width:600,height:800),for:.cropBox)
+            let bitmap = try XCTUnwrap(image.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))
+            let background = try XCTUnwrap(bitmap.colorAt(x:260,y:310)?.usingColorSpace(.sRGB))
+            XCTAssertEqual(background.redComponent,0.8,accuracy:0.03)
+            XCTAssertEqual(background.greenComponent,0.9,accuracy:0.03)
+            XCTAssertEqual(background.blueComponent,1,accuracy:0.03)
+            var redPixels = 0
+            for y in 250..<320 { for x in 50..<270 {
+                if let c = bitmap.colorAt(x:x,y:y)?.usingColorSpace(.sRGB), c.redComponent > 0.5, c.greenComponent < 0.4, c.blueComponent < 0.4 { redPixels += 1 }
+            } }
+            // Glyphs must paint visible pixels, without filling the whole box.
+            XCTAssertTrue(redPixels > 50)
+            XCTAssertTrue(redPixels < 3000)
+            if !flatten { XCTAssertEqual(page.annotations.first?.contents,"Visible text") }
+            else { XCTAssertTrue(doc.string?.contains("Visible text") == true) }
+        }
+    }
     func testRedactionAndNonIncrementalExport() throws {
         let store = try DocumentStore(data:Self.fixture())
         let line = try XCTUnwrap(store.read { try $0.lines(page:0).first })

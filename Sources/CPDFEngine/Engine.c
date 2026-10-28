@@ -197,7 +197,13 @@ int pe_annotate(PEEngine *e,int page,const char *kind,PERect r,const PERect *qua
             for(int i=0;i<count;i++) q[i]=fz_quad_from_rect(rect(quads[i]));
             pdf_set_annot_quad_points(ctx,a,count,q);
         }
-        if(type==PDF_ANNOT_FREE_TEXT) pdf_set_annot_default_appearance(ctx,a,"Helv",size,3,c);
+        if(type==PDF_ANNOT_FREE_TEXT) {
+            // FreeText /C paints the box background, while /DA colors the glyphs.
+            // Sharing the color makes the text disappear into a solid rectangle.
+            pdf_set_annot_color(ctx,a,0,c);
+            pdf_set_annot_border_width(ctx,a,0);
+            pdf_set_annot_default_appearance(ctx,a,"Helv",size,3,c);
+        }
         if(type==PDF_ANNOT_LINE) { pdf_set_annot_line(ctx,a,point_count>1?fz_make_point(points[0].x,points[0].y):fz_make_point(r.x0,r.y0),point_count>1?fz_make_point(points[point_count-1].x,points[point_count-1].y):fz_make_point(r.x1,r.y1)); pdf_set_annot_line_end_style(ctx,a,PDF_ANNOT_LE_CLOSED_ARROW); }
         if(type==PDF_ANNOT_INK) {
             if(point_count<2) fz_throw(ctx,FZ_ERROR_ARGUMENT,"Draw a stroke first.");

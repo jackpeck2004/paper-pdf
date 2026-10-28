@@ -45,3 +45,10 @@ Not verified: execution on Intel hardware or macOS 14, broad real-world PDF comp
 - Replaced the document reference with weak ownership. Document-dependent actions acquire a local strong reference or return; delayed inline-editor and background callbacks tolerate a missing document.
 - Added a native regression that releases the document while retaining its viewer, posts scale/page notifications, resizes the PDF canvas, invokes page actions, and commits an existing inline text editor. The weak-document assertion also checks that the fix does not retain the document.
 - All 31 native regression checks passed, including on-device OCR, with the compatible macOS 26.5 SDK.
+
+## Visible text boxes — 28 October 2026
+
+- Reproduced the solid-rectangle bug with a colored FreeText annotation: the same RGB color was written into the box fill (`/C`) and text appearance (`/DA`). Pixel checks failed on editable and flattened exports before the fix.
+- FreeText now has transparent fill and no border; the chosen color applies to glyphs. Other annotation styles are unchanged. Text defaults to black rather than a color that changes with the system's light/dark appearance.
+- Text Box supports clicking to type or dragging a width. The saved area expands for multiline content within the page, and empty input adds no annotation.
+- All 33 native checks pass. New coverage verifies visible glyph pixels, preserved background, editable and flattened export, real mouse click dispatch, multiline sizing, reediting, saving/reopening, empty-input cancellation, and undo/redo.

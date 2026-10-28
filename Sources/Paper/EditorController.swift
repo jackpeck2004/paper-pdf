@@ -284,7 +284,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
     @objc func chooseTool(_ sender: NSButton) { selectTool(EditorTool.allCases[sender.tag]) }
     func selectTool(_ tool: EditorTool) {
         pdf.endTextEditing(); pdf.tool = tool
-        if [.text,.correct,.ink,.rectangle,.oval,.arrow].contains(tool), color.color == .systemYellow { color.color = .labelColor }
+        if [.text,.correct,.ink,.rectangle,.oval,.arrow].contains(tool), color.color == .systemYellow { color.color = .black }
         if tool == .highlight { color.color = .systemYellow }
         if tool != .select { showMarkup() }
         updateToolButtons()

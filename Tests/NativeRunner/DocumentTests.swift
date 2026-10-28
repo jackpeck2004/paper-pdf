@@ -58,6 +58,50 @@ final class DocumentTests: XCTestCase {
         XCTAssertTrue(controller.pdf.document?.page(at:0)?.annotations.allSatisfy(\.isReadOnly) == true)
         document.updateChangeCount(.changeCleared)
     }
+    func testClickToTypeTextBoxAndReedit() throws {
+        let document = PaperDocument()
+        try document.read(from:EngineTests.fixture(),ofType:"com.adobe.pdf")
+        document.makeWindowControllers()
+        defer { document.updateChangeCount(.changeCleared); document.close() }
+        let controller = try XCTUnwrap(document.windowControllers.first?.contentViewController as? EditorController)
+        let window = try XCTUnwrap(document.windowControllers.first?.window)
+        window.contentView?.layoutSubtreeIfNeeded()
+        controller.pdf.layoutDocumentView()
+        controller.selectTool(.text)
+        let page = try XCTUnwrap(controller.pdf.document?.page(at:0))
+        let point = controller.pdf.convert(CGPoint(x:120,y:550),from:page)
+        let location = controller.pdf.convert(point,to:nil)
+        for type in [NSEvent.EventType.leftMouseDown,.leftMouseUp] {
+            let event = try XCTUnwrap(NSEvent.mouseEvent(with:type,location:location,modifierFlags:[],timestamp:0,windowNumber:window.windowNumber,context:nil,eventNumber:0,clickCount:1,pressure:1))
+            if type == .leftMouseDown { controller.pdf.mouseDown(with:event) } else { controller.pdf.mouseUp(with:event) }
+        }
+        let editor = try XCTUnwrap(controller.pdf.inlineEditor)
+        editor.text.string = "Text typed on the page\nSecond line\nThird line"
+        let undo = try XCTUnwrap(document.undoManager)
+        undo.groupsByEvent = false; undo.beginUndoGrouping(); editor.commit(); undo.endUndoGrouping()
+        let addedPage = try XCTUnwrap(controller.pdf.document?.page(at:0))
+        let annotation = try XCTUnwrap(addedPage.annotations.first { $0.type == "FreeText" })
+        XCTAssertEqual(annotation.contents,"Text typed on the page\nSecond line\nThird line")
+        XCTAssertTrue(annotation.bounds.width >= 200)
+        XCTAssertTrue(annotation.bounds.height >= 48)
+        undo.undo()
+        XCTAssertTrue(controller.pdf.document?.page(at:0)?.annotations.isEmpty == true)
+        undo.redo()
+        let restoredPage = try XCTUnwrap(controller.pdf.document?.page(at:0))
+        let restored = try XCTUnwrap(restoredPage.annotations.first)
+        controller.selectTool(.select); controller.inspect(page:restoredPage,annotation:restored)
+        let reeditor = try XCTUnwrap(controller.pdf.inlineEditor)
+        XCTAssertEqual(reeditor.text.string,"Text typed on the page\nSecond line\nThird line")
+        reeditor.text.string = "Edited text box"
+        undo.beginUndoGrouping(); reeditor.commit(); undo.endUndoGrouping()
+        let reopened = try XCTUnwrap(PDFDocument(data:document.data(ofType:"com.adobe.pdf")))
+        XCTAssertEqual(reopened.page(at:0)?.annotations.first?.contents,"Edited text box")
+        let revision = document.store.currentRevision
+        let latest = try XCTUnwrap(controller.pdf.document?.page(at:0))
+        controller.gesture(.text,page:latest,bounds:CGRect(x:80,y:400,width:140,height:70),points:[])
+        controller.pdf.inlineEditor?.commit()
+        XCTAssertEqual(document.store.currentRevision,revision)
+    }
     func testInlineTextEditingAndIconToolbar() throws {
         let document = PaperDocument()
         try document.read(from:EngineTests.fixture(),ofType:"com.adobe.pdf")
