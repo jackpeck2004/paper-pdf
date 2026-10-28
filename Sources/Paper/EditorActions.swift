@@ -211,7 +211,7 @@ extension EditorController {
         let page = currentPageIndex; paper.perform("Add Bookmark") { try $0.bookmark(page:page,title:title) }
     }
     @objc func removeBookmark(_ sender: Any?) {
-        guard sections.selectedSegment == 1, outline.selectedRow >= 0 else { return }
+        guard sidebarMode.rawValue == 1, outline.selectedRow >= 0 else { return }
         // Nested bookmarks are preserved; this first release manages root entries.
         guard let root = selectedRootBookmark() else { alert("Select a Top-Level Bookmark", "Nested bookmarks are preserved. Select a top-level entry to remove its subtree."); return }
         paper.perform("Remove Bookmark") { try $0.bookmark(page:0,removeIndex:root) }

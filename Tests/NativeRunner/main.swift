@@ -44,6 +44,8 @@ let nativeCases: [(String,() throws -> Void)] = [
     ("view-mode keyboard dispatch",documentTests.testReaderMenuShortcutsDispatchToAllViewModes),
     ("page navigation and shortcut aliases",documentTests.testGoToPageFieldAndShortcutAliases),
     ("responsive layout and native glass",documentTests.testResponsiveLayoutUsesNativeGlass),
+    ("Preview sidebar and single page control",documentTests.testPreviewSidebarAndSinglePageControl),
+    ("native thumbnail reordering and undo",documentTests.testNativeThumbnailReorderCommitsAndUndoes),
     ("native atomic save and reopen",documentTests.testNativeAtomicSaveAndReopen)
 ]
 for (name,test) in nativeCases {

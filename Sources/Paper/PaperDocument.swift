@@ -55,14 +55,16 @@ final class PaperDocument: NSDocument {
         if store.currentRevision == 0, let originalData { return originalData }
         return try store.read { try $0.export(password:savePassword) }
     }
-    func perform(_ name: String, expectedRevision: UInt64? = nil, _ action: (PDFEngine) throws -> Void) {
+    @discardableResult
+    func perform(_ name: String, expectedRevision: UInt64? = nil, _ action: (PDFEngine) throws -> Void) -> Bool {
         do {
-            guard authorizeSignedEdit() else { return }
+            guard authorizeSignedEdit() else { return false }
             let change = try store.transact(expectedRevision:expectedRevision,action)
             registerRestore(change.before,name:name)
             updateChangeCount(.changeDone)
             refresh(change.after)
-        } catch { presentError(error) }
+            return true
+        } catch { presentError(error); return false }
     }
     private func authorizeSignedEdit() -> Bool {
         guard store.originallySigned && !acceptedSignatureWarning else { return true }

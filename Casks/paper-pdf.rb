@@ -1,6 +1,6 @@
 cask "paper-pdf" do
-  version "0.2.0"
-  sha256 "9c3cc99596551215339bc1d0392e3234347ab92a41a1137b572b5ea499a91497"
+  version "0.2.1"
+  sha256 "556519bf758055b1c9269dc47faa206cb1bff3a56688bc6b46b9178fd62e18c3"
 
   url "https://github.com/jackpeck2004/paper-pdf/releases/download/v#{version}/Paper-#{version}-universal.zip",
       verified: "github.com/jackpeck2004/paper-pdf/"
@@ -13,7 +13,7 @@ cask "paper-pdf" do
     strategy :github_latest
   end
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "Paper.app"
 

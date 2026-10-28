@@ -25,3 +25,10 @@ Not verified: execution on Intel hardware or macOS 14, broad real-world PDF comp
 - At the user's explicit selection, changed Paper-authored source to MIT while retaining MuPDF's AGPL terms and combined-distribution requirements. Preserved the AGPL text, all vendor notices, and the complete corresponding source packaging.
 - Created an app icon with built-in ImageGen; generated and packaged standard macOS icon representations. Apple's `iconutil` required an ordinary local process on this machine; the sandboxed run rejected an otherwise valid iconset. Icon generation succeeds outside that sandbox.
 - About now uses the standard macOS About panel. The bundle declares its icon and includes the MIT and MuPDF notices.
+
+## Preview-style sidebar and public distribution — 28 October 2026
+
+- Replaced custom page rows with Apple's `PDFThumbnailView`: one column of large page previews, system selection styling, page labels underneath, and native multi-selection/drag gestures.
+- Removed the segmented sidebar header in favor of the toolbar's sidebar disclosure menu. Removed the duplicate toolbar page capsule; Go to Page focuses the single footer control.
+- Native page-drag notifications are deferred through the app run loop and translated into serialized MuPDF commands. A regression test posts the native notification and verifies persistence and undo.
+- All 29 engine and native regression checks passed. The release remains ad-hoc signed; notarization and live visual acceptance remain separate release gates.

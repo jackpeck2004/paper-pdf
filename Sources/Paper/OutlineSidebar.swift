@@ -39,7 +39,7 @@ extension EditorController: NSOutlineViewDataSource, NSOutlineViewDelegate {
                     case .success(let contents): self.chapters = contents.chapters.map(ChapterNode.init); self.chapterSource = contents.source
                     case .failure: self.chapters = []; self.chapterSource = .unavailable
                     }
-                    if self.sections.selectedSegment == 1 { self.showChapters() }
+                    if self.sidebarMode.rawValue == 1 { self.showChapters() }
                 }
             }
         } catch {
@@ -56,7 +56,7 @@ extension EditorController: NSOutlineViewDataSource, NSOutlineViewDelegate {
         }
         outline.reloadData()
         for node in visibleChapters { outline.expandItem(node) }
-        emptyContents.isHidden = !visibleChapters.isEmpty || sections.selectedSegment != 1
+        emptyContents.isHidden = !visibleChapters.isEmpty || sidebarMode.rawValue != 1
         emptyContents.stringValue = chapters.isEmpty ? "No chapters found\n\nScanned books need text recognition before chapters can be detected." : "No matching chapters"
     }
     func outlineView(_ outlineView: NSOutlineView,numberOfChildrenOfItem item: Any?) -> Int {

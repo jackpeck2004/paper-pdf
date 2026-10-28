@@ -10,7 +10,10 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
     let sidebar = NSView()
     let inspector = NSStackView()
     let table = NSTableView()
-    let sections = NSSegmentedControl(labels:["Pages","Outline","Notes"],trackingMode:.selectOne,target:nil,action:nil)
+    var sidebarMode = SidebarMode.pages
+    let thumbnails = PDFThumbnailView()
+    let sidebarBody = NSView()
+    var pageIdentityToIndex: [ObjectIdentifier:Int] = [:]
     let filter = NSSearchField()
     let search = NSSearchField()
     let split = NSSplitViewController()
@@ -52,7 +55,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
     var selectedAnnotation: (page:Int,index:Int)?
     private let comment = NSTextView()
     private var observers: [NSObjectProtocol] = []
-    private var isRefreshing = false
+    var isRefreshing = false
     var ocrRunning = false
     init(document: PaperDocument) { paper = document; super.init(nibName:nil,bundle:nil) }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
@@ -92,12 +95,20 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         for name in [Notification.Name.PDFViewPageChanged, .PDFViewScaleChanged] {
             observers.append(NotificationCenter.default.addObserver(forName:name,object:pdf,queue:.main) { [weak self] _ in self?.updateStatus() })
         }
+        observers.append(NotificationCenter.default.addObserver(forName:.PDFThumbnailViewDocumentEdited,object:nil,queue:.main) { [weak self] _ in RunLoop.main.perform(inModes:[.default,.eventTracking]) { self?.commitThumbnailOrder() } })
         do { display(try paper.store.snapshot()) } catch { paper.presentError(error) }
     }
     private func makeDocumentArea() -> NSView {
         let root = documentArea; root.translatesAutoresizingMaskIntoConstraints = false
         pdf.translatesAutoresizingMaskIntoConstraints = false
-        let footer = NSStackView(views:[status,NSView(),progress])
+        pageField.alignment = .center; pageField.isBordered = false; pageField.drawsBackground = false
+        pageField.font = .monospacedDigitSystemFont(ofSize:11,weight:.regular)
+        pageField.widthAnchor.constraint(equalToConstant:34).isActive = true
+        pageField.target = self; pageField.action = #selector(commitPageNumber(_:))
+        pageField.setAccessibilityLabel("Page number"); pageField.toolTip = "Go to page (⌥⌘G or ⌘L)"
+        pageCountLabel.font = .systemFont(ofSize:11); pageCountLabel.textColor = .secondaryLabelColor
+        let pageControl = NSStackView(views:[pageField,pageCountLabel]); pageControl.orientation = .horizontal; pageControl.spacing = 3
+        let footer = NSStackView(views:[pageControl,status,NSView(),progress])
         footer.orientation = .horizontal; footer.spacing = 12
         footer.translatesAutoresizingMaskIntoConstraints = false
         status.font = .systemFont(ofSize:11); status.textColor = .secondaryLabelColor
@@ -107,7 +118,6 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         return root
     }
     private func buildSidebar() {
-        sections.selectedSegment = 0; sections.target = self; sections.action = #selector(sidebarChanged(_:)); sections.controlSize = .small
         filter.placeholderString = "Filter contents"; filter.target = self; filter.action = #selector(sidebarChanged(_:)); filter.sendsSearchStringImmediately = true
         table.addTableColumn(NSTableColumn(identifier:.init("content")))
         table.headerView = nil; table.delegate = self; table.dataSource = self
@@ -122,13 +132,22 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         sidebarScroll.documentView = table; sidebarScroll.hasVerticalScroller = true; sidebarScroll.drawsBackground = false; sidebarScroll.autohidesScrollers = true
         contentsDescription.font = .systemFont(ofSize:11); contentsDescription.textColor = .secondaryLabelColor
         emptyContents.font = .systemFont(ofSize:12); emptyContents.textColor = .secondaryLabelColor; emptyContents.alignment = .center
-        let stack = NSStackView(views:[sections,filter,contentsDescription,sidebarScroll]); stack.orientation = .vertical; stack.alignment = .width; stack.spacing = 10; stack.translatesAutoresizingMaskIntoConstraints = false
+        thumbnails.pdfView = pdf; thumbnails.backgroundColor = .clear
+        thumbnails.maximumNumberOfColumns = 1; thumbnails.thumbnailSize = NSSize(width:140,height:190)
+        thumbnails.labelFont = .systemFont(ofSize:12)
+        thumbnails.allowsMultipleSelection = true; thumbnails.allowsDragging = true
+        thumbnails.setAccessibilityLabel("Page thumbnails")
+        for child in [thumbnails,sidebarScroll] {
+            child.translatesAutoresizingMaskIntoConstraints = false; sidebarBody.addSubview(child)
+            NSLayoutConstraint.activate([child.leadingAnchor.constraint(equalTo:sidebarBody.leadingAnchor),child.trailingAnchor.constraint(equalTo:sidebarBody.trailingAnchor),child.topAnchor.constraint(equalTo:sidebarBody.topAnchor),child.bottomAnchor.constraint(equalTo:sidebarBody.bottomAnchor)])
+        }
+        let stack = NSStackView(views:[filter,contentsDescription,sidebarBody]); stack.orientation = .vertical; stack.alignment = .width; stack.spacing = 10; stack.translatesAutoresizingMaskIntoConstraints = false
         let material = NSVisualEffectView(); material.material = .sidebar; material.blendingMode = .behindWindow; material.state = .followsWindowActiveState
         material.translatesAutoresizingMaskIntoConstraints = false; sidebar.addSubview(material); sidebar.addSubview(stack)
         emptyContents.translatesAutoresizingMaskIntoConstraints = false; sidebar.addSubview(emptyContents)
         NSLayoutConstraint.activate([
             material.leadingAnchor.constraint(equalTo:sidebar.leadingAnchor),material.trailingAnchor.constraint(equalTo:sidebar.trailingAnchor),material.topAnchor.constraint(equalTo:sidebar.topAnchor),material.bottomAnchor.constraint(equalTo:sidebar.bottomAnchor),
-            stack.topAnchor.constraint(equalTo:sidebar.topAnchor,constant:12),stack.leadingAnchor.constraint(equalTo:sidebar.leadingAnchor,constant:10),stack.trailingAnchor.constraint(equalTo:sidebar.trailingAnchor,constant:-10),stack.bottomAnchor.constraint(equalTo:sidebar.bottomAnchor),sidebarScroll.heightAnchor.constraint(greaterThanOrEqualToConstant:100),
+            stack.topAnchor.constraint(equalTo:sidebar.topAnchor,constant:12),stack.leadingAnchor.constraint(equalTo:sidebar.leadingAnchor,constant:10),stack.trailingAnchor.constraint(equalTo:sidebar.trailingAnchor,constant:-10),stack.bottomAnchor.constraint(equalTo:sidebar.bottomAnchor),sidebarBody.heightAnchor.constraint(greaterThanOrEqualToConstant:100),
             emptyContents.leadingAnchor.constraint(equalTo:sidebar.leadingAnchor,constant:22),emptyContents.trailingAnchor.constraint(equalTo:sidebar.trailingAnchor,constant:-22),emptyContents.centerYAnchor.constraint(equalTo:sidebar.centerYAnchor)
         ])
     }
@@ -196,17 +215,22 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         toolButtons[tool,default:[]].append(button); return button
     }
     func installToolbar(window: NSWindow) {
-        let bar = NSToolbar(identifier:"PaperToolbarV2"); bar.delegate = self; bar.allowsUserCustomization = true; bar.autosavesConfiguration = true; bar.displayMode = .iconOnly
+        let bar = NSToolbar(identifier:"PaperToolbarV3"); bar.delegate = self; bar.allowsUserCustomization = true; bar.autosavesConfiguration = true; bar.displayMode = .iconOnly
         window.toolbar = bar; window.toolbarStyle = .unified
     }
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [id("sidebar"),id("viewMode"),id("page"),id("zoom"),.flexibleSpace,id("primaryTools"),id("markup"),id("search"),id("inspector")]
+        [id("sidebar"),id("viewMode"),id("zoom"),.flexibleSpace,id("primaryTools"),id("markup"),id("search"),id("inspector")]
     }
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         toolbarDefaultItemIdentifiers(toolbar)+[id("select"),id("highlight"),id("note"),id("correct"),id("signature"),id("text"),id("ocr"),id("rotate"),id("export"),.space]
     }
     private func id(_ value: String) -> NSToolbarItem.Identifier { .init(value) }
     func toolbar(_ toolbar: NSToolbar,itemForItemIdentifier identifier: NSToolbarItem.Identifier,willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        if identifier.rawValue == "sidebar" {
+            let item = NSMenuToolbarItem(itemIdentifier:identifier)
+            configure(item,"Sidebar","sidebar.left",#selector(toggleSidebar(_:)))
+            item.menu = makeSidebarMenu(); item.showsIndicator = true; return item
+        }
         if identifier.rawValue == "primaryTools" {
             let group = NSToolbarItemGroup(itemIdentifier:identifier,images:primaryTools.map { NSImage(systemSymbolName:$0.symbol,accessibilityDescription:$0.rawValue)! },selectionMode:.selectOne,labels:primaryTools.map(\.rawValue),target:self,action:#selector(choosePrimaryTool(_:)))
             group.label = "Tools"; group.controlRepresentation = .expanded; group.isBordered = true
@@ -228,13 +252,6 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         case "sidebar": configure(item,"Sidebar","sidebar.left",#selector(toggleSidebar(_:)))
         case "inspector": configure(item,"Inspector","sidebar.right",#selector(toggleInspector(_:)))
         case "markup": configure(item,"Show Markup Toolbar","pencil.tip.crop.circle",#selector(toggleMarkup(_:)))
-        case "page":
-            pageField.alignment = .center; pageField.isBordered = false; pageField.drawsBackground = false; pageField.focusRingType = .default
-            pageField.font = .monospacedDigitSystemFont(ofSize:12,weight:.medium); pageField.widthAnchor.constraint(equalToConstant:38).isActive = true
-            pageField.target = self; pageField.action = #selector(commitPageNumber(_:)); pageField.setAccessibilityLabel("Page number"); pageField.toolTip = "Go to page (⌥⌘G or ⌘L)"
-            pageCountLabel.font = .systemFont(ofSize:11); pageCountLabel.textColor = .secondaryLabelColor
-            let row = NSStackView(views:[pageField,pageCountLabel]); row.orientation = .horizontal; row.spacing = 3; row.edgeInsets = NSEdgeInsets(top:5,left:8,bottom:5,right:10)
-            item.view = NativeGlass.surface(content:row,cornerRadius:16); item.label = "Page"; updateStatus()
         case "zoom":
             let control = NSSegmentedControl(images:[NSImage(systemSymbolName:"minus.magnifyingglass",accessibilityDescription:"Zoom out")!,NSImage(systemSymbolName:"plus.magnifyingglass",accessibilityDescription:"Zoom in")!],trackingMode:.momentary,target:self,action:#selector(zoomControl(_:)))
             control.segmentStyle = .separated; item.view = control; item.label = "Zoom"
@@ -285,6 +302,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         // native inspector actions and the authoritative command queue.
         for i in 0..<document.pageCount { for a in document.page(at:i)?.annotations ?? [] { a.isReadOnly = true } }
         pdf.endTextEditing()
+        pageIdentityToIndex = Dictionary(uniqueKeysWithValues:(0..<document.pageCount).compactMap { index in document.page(at:index).map { (ObjectIdentifier($0),index) } })
         pdf.document = document
         if let page = document.page(at:min(oldIndex,max(0,document.pageCount-1))) {
             if let oldPoint { pdf.go(to:PDFDestination(page:page,at:oldPoint)) } else { pdf.go(to:page) }
@@ -295,7 +313,12 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         reloadSidebar(); updateStatus()
     }
     var currentPageIndex: Int { guard let page = pdf.currentPage, let doc = pdf.document else { return 0 }; return doc.index(for:page) }
-    var selectedPages: [Int] { sections.selectedSegment == 0 && !table.selectedRowIndexes.isEmpty ? Array(table.selectedRowIndexes) : [currentPageIndex] }
+    var selectedPages: [Int] {
+        if sidebarMode == .pages, let pages = thumbnails.selectedPages, !pages.isEmpty, let document = pdf.document {
+            return pages.map { document.index(for:$0) }.filter { $0 != NSNotFound }.sorted()
+        }
+        return [currentPageIndex]
+    }
     var rgbColor: UInt32 {
         let c = color.color.usingColorSpace(.sRGB) ?? .black
         return UInt32(c.redComponent*255)<<16 | UInt32(c.greenComponent*255)<<8 | UInt32(c.blueComponent*255)
@@ -304,8 +327,8 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
     func index(_ page: PDFPage) -> Int { pdf.document?.index(for:page) ?? 0 }
     func updateStatus() {
         pageField.integerValue = currentPageIndex+1; pageCountLabel.stringValue = "of \(pdf.document?.pageCount ?? 0)"
-        status.stringValue = "Page \(currentPageIndex+1) of \(pdf.document?.pageCount ?? 0)   ·   \(Int(pdf.scaleFactor*100))%" + (paper.store.permitsEditing ? "" : "   ·   Read only")
-        if !isRefreshing && sections.selectedSegment == 0 && table.selectedRowIndexes.count <= 1 && !table.selectedRowIndexes.contains(currentPageIndex) { table.selectRowIndexes(IndexSet(integer:currentPageIndex),byExtendingSelection:false) }
+        status.stringValue = "\(Int(pdf.scaleFactor*100))%" + (paper.store.permitsEditing ? "" : "   ·   Read only")
+
     }
     @objc func toggleSidebar(_ sender: Any?) { sidebarItem.isCollapsed.toggle() }
     @objc func toggleInspector(_ sender: Any?) { inspectorItem.isCollapsed.toggle() }
@@ -337,22 +360,24 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
                 }
             }
         }
-        filter.isHidden = sections.selectedSegment == 0
-        contentsDescription.isHidden = sections.selectedSegment != 1
+        filter.isHidden = sidebarMode.rawValue == 0
+        contentsDescription.isHidden = sidebarMode.rawValue != 1
         emptyContents.isHidden = true
-        sidebarScroll.documentView = sections.selectedSegment == 1 ? outline : table
-        if sections.selectedSegment == 1 { loadBookContents() }
-        table.rowHeight = sections.selectedSegment == 0 ? 100 : 50
+        thumbnails.isHidden = sidebarMode != .pages
+        sidebarScroll.isHidden = sidebarMode == .pages
+        sidebarScroll.documentView = sidebarMode == .outline ? outline : table
+        if sidebarMode.rawValue == 1 { loadBookContents() }
+        table.rowHeight = sidebarMode.rawValue == 0 ? 100 : 50
         table.reloadData()
     }
     func numberOfRows(in tableView: NSTableView) -> Int {
-        switch sections.selectedSegment { case 0: return pdf.document?.pageCount ?? 0; case 1: return 0; default: return annotationRows.count }
+        switch sidebarMode.rawValue { case 0: return pdf.document?.pageCount ?? 0; case 1: return 0; default: return annotationRows.count }
     }
     func tableView(_ tableView: NSTableView,viewFor tableColumn: NSTableColumn?,row: Int) -> NSView? {
         let cell = NSTableCellView()
         let label = NSTextField(labelWithString:""); label.lineBreakMode = .byTruncatingTail; label.maximumNumberOfLines = 2; label.font = .systemFont(ofSize:12); label.translatesAutoresizingMaskIntoConstraints = false
         cell.addSubview(label); cell.textField = label
-        if sections.selectedSegment == 0 {
+        if sidebarMode.rawValue == 0 {
             let image = NSImageView(); image.image = pdf.document?.page(at:row)?.thumbnail(of:NSSize(width:44,height:62),for:.cropBox); image.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(image); cell.imageView = image
             label.stringValue = "Page \(row+1)"
             NSLayoutConstraint.activate([image.leadingAnchor.constraint(equalTo:cell.leadingAnchor,constant:12),image.centerYAnchor.constraint(equalTo:cell.centerYAnchor),image.widthAnchor.constraint(equalToConstant:44),image.heightAnchor.constraint(equalToConstant:62),label.leadingAnchor.constraint(equalTo:image.trailingAnchor,constant:12)])
@@ -363,19 +388,19 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !isRefreshing, table.selectedRow >= 0 else { return }
         let row = table.selectedRow
-        switch sections.selectedSegment {
+        switch sidebarMode.rawValue {
         case 0: if let page = pdf.document?.page(at:row) { pdf.go(to:page) }
         case 1: break
         default: if row < annotationRows.count { let a = annotationRows[row]; if let page = pdf.document?.page(at:a.page) { pdf.go(to:a.annotation.bounds,on:page); inspect(page:page,annotation:a.annotation) } }
         }
     }
-    @objc func sidebarDoubleClick(_ sender: Any?) { if sections.selectedSegment == 2 { showInspector() } }
+    @objc func sidebarDoubleClick(_ sender: Any?) { if sidebarMode.rawValue == 2 { showInspector() } }
     func tableView(_ tableView: NSTableView,pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
-        guard sections.selectedSegment == 0 else { return nil }
+        guard sidebarMode.rawValue == 0 else { return nil }
         let item = NSPasteboardItem(); item.setString("\(row)",forType:.init("org.paperpdf.page")); return item
     }
     func tableView(_ tableView: NSTableView,validateDrop info: NSDraggingInfo,proposedRow row: Int,proposedDropOperation op: NSTableView.DropOperation) -> NSDragOperation {
-        guard sections.selectedSegment == 0 else { return [] }; tableView.setDropRow(row,dropOperation:.above)
+        guard sidebarMode.rawValue == 0 else { return [] }; tableView.setDropRow(row,dropOperation:.above)
         return info.draggingSource as? NSTableView === table ? .move : .copy
     }
     func tableView(_ tableView: NSTableView,acceptDrop info: NSDraggingInfo,row: Int,dropOperation: NSTableView.DropOperation) -> Bool {

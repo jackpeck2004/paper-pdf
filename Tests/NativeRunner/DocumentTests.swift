@@ -69,7 +69,7 @@ final class DocumentTests: XCTestCase {
         document.makeWindowControllers()
         defer { document.close() }
         let controller = try XCTUnwrap(document.windowControllers.first?.contentViewController as? EditorController)
-        controller.sections.selectedSegment = 1
+        controller.sidebarMode = .outline
         controller.chapters = [ChapterNode(BookChapter(title:"Part One",page:0,children:[BookChapter(title:"First Chapter",page:0)]))]
         controller.chapterSource = .headings
         controller.showChapters()
@@ -165,6 +165,51 @@ final class DocumentTests: XCTestCase {
                 if let data = rep.representation(using:.png,properties:[:]) { try data.write(to:URL(fileURLWithPath:directory).appendingPathComponent("editor-layout.png")) }
             }
         }
+    }
+    func testPreviewSidebarAndSinglePageControl() throws {
+        let document = PaperDocument()
+        try document.read(from:EngineTests.fixture(),ofType:"com.adobe.pdf")
+        document.makeWindowControllers()
+        defer { document.close() }
+        let window = try XCTUnwrap(document.windowControllers.first?.window)
+        let controller = try XCTUnwrap(window.contentViewController as? EditorController)
+        XCTAssertFalse(controller.toolbarDefaultItemIdentifiers(try XCTUnwrap(window.toolbar)).contains(.init("page")))
+        XCTAssertTrue(controller.pageField.isDescendant(of:controller.documentArea))
+        XCTAssertTrue(controller.thumbnails.pdfView === controller.pdf)
+        XCTAssertEqual(controller.thumbnails.maximumNumberOfColumns,1)
+        XCTAssertGreaterThan(controller.thumbnails.thumbnailSize.width,CGFloat(100))
+        XCTAssertTrue(controller.thumbnails.allowsMultipleSelection)
+        XCTAssertTrue(controller.thumbnails.allowsDragging)
+        XCTAssertTrue(controller.sidebarScroll.isHidden)
+        XCTAssertFalse(controller.thumbnails.isHidden)
+        let menu = controller.makeSidebarMenu()
+        XCTAssertEqual(menu.items.map(\.title),["Thumbnails","Table of Contents","Highlights and Notes"])
+        controller.chooseSidebarMode(menu.items[2])
+        XCTAssertEqual(controller.sidebarMode,.notes)
+        XCTAssertTrue(controller.thumbnails.isHidden)
+        XCTAssertFalse(controller.sidebarScroll.isHidden)
+        controller.chooseSidebarMode(menu.items[0])
+        XCTAssertFalse(controller.thumbnails.isHidden)
+        XCTAssertFalse(controller.status.stringValue.contains("of"))
+    }
+    func testNativeThumbnailReorderCommitsAndUndoes() throws {
+        let document = PaperDocument()
+        try document.read(from:BookOutlineTests.book([BookOutlineTests.page("Chapter 1"),BookOutlineTests.page("Chapter 2")]),ofType:"com.adobe.pdf")
+        document.makeWindowControllers()
+        defer { document.updateChangeCount(.changeCleared); document.close() }
+        let controller = try XCTUnwrap(document.windowControllers.first?.contentViewController as? EditorController)
+        let snapshot = try XCTUnwrap(controller.pdf.document)
+        let second = try XCTUnwrap(snapshot.page(at:1))
+        let undo = try XCTUnwrap(document.undoManager)
+        undo.groupsByEvent = false; undo.beginUndoGrouping()
+        snapshot.removePage(at:1); snapshot.insert(second,at:0)
+        NotificationCenter.default.post(name:.PDFThumbnailViewDocumentEdited,object:controller.thumbnails)
+        RunLoop.current.run(until:Date().addingTimeInterval(0.05))
+        undo.endUndoGrouping()
+        XCTAssertTrue(controller.pdf.document?.page(at:0)?.string?.contains("Chapter 2") == true)
+        XCTAssertTrue(PDFDocument(data:try document.store.snapshot().data)?.page(at:0)?.string?.contains("Chapter 2") == true)
+        undo.undo()
+        XCTAssertTrue(controller.pdf.document?.page(at:0)?.string?.contains("Chapter 1") == true)
     }
     func testNativeAtomicSaveAndReopen() throws {
         let document = PaperDocument(), original = EngineTests.fixture()

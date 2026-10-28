@@ -65,7 +65,7 @@ The direct test runner executes the same core regression methods as XCTest, plus
 - Choose the **Correct Text** icon, then click a line. Type directly on the page and press Return or Apply; Escape cancels. The floating markup palette provides font, size, and color controls. Original glyphs are removed; the page background stays intact. Text boxes, comments, and text form fields also use on-page editing.
 - Choose **Select**, then click an annotation to edit its comment or move/resize supported annotation types in the inspector. Select a link to edit its destination or delete it.
 - **Edit Image** selects an existing page image for move, resize, replacement, or deletion through a structured inspector. Placed images and visual signatures are editable stamp annotations and use the Select tool.
-- The resizable sidebar switches between pages, a collapsible chapter outline, and searchable notes. Embedded PDF outlines are preferred; when absent, Paper detects chapters from printed contents pages and text headings in the background, matching destinations to account for front matter. Detected chapters are labelled as inferred navigation and do not modify the PDF. Drag page thumbnails to reorder; use Command/Shift to select multiple pages. Drop PDFs/images to insert pages.
+- The sidebar menu switches between large native page thumbnails, a collapsible chapter outline, and searchable notes. Thumbnails have page numbers underneath and use the system selection appearance, with no segmented header. Embedded PDF outlines are preferred; when absent, Paper detects chapters from printed contents pages and text headings in the background, matching destinations to account for front matter. Detected chapters are labelled as inferred navigation and do not modify the PDF. Drag page thumbnails to reorder; use Command/Shift to select multiple pages. Drop PDFs/images to insert pages.
 - Use the Pages menu for merge, extract, duplicate, delete, rotation, and blank pages. Choose Crop and drag to change the visible page box.
 - Choose **Fill Form**, then click a field, or use **Tools → Fill Form Field**. AcroForm text, button, and choice values are supported without running document scripts.
 - Choose **Signature**, drag an area, and draw or import a signature. Signatures are stored under `~/Library/Application Support/Paper/Signatures`, with owner-only permissions. They are visual signatures, not certificate signatures.
@@ -76,7 +76,7 @@ The direct test runner executes the same core regression methods as XCTest, plus
 
 ## Keyboard and page layout
 
-The toolbar has an explicit **View** menu for Single Page, Continuous, Two Pages, and Two Pages Continuous, with a checkmark for the current layout. The editable page field accepts physical page numbers or matching PDF page labels.
+The toolbar has an explicit **View** menu for Single Page, Continuous, Two Pages, and Two Pages Continuous, with a checkmark for the current layout. The single page field at the bottom left accepts physical page numbers or matching PDF page labels; there is no duplicate toolbar page counter.
 
 | Action | Shortcut |
 | --- | --- |
@@ -113,7 +113,7 @@ This is an initial development implementation, not a production-certified Acroba
 
 ## Tests
 
-All 27 regression and native-document checks passed on the development machine. Apple Vision requires an unrestricted local process for its pixel buffers; the sandboxed OCR check failed while the ordinary local run passed.
+All 29 regression and native-document checks passed on the development machine. Apple Vision requires an unrestricted local process for its pixel buffers; the sandboxed OCR check failed while the ordinary local run passed.
 
 The regression suite covers real text replacement and background retention, rollback/stale revisions, annotation persistence, undo snapshots, redaction/non-incremental output, encryption, flattening, page order/extraction, rotated crop geometry, image occurrence removal, form persistence, rejected merges, invisible OCR layers, malformed PDFs, and unsupported text. Test fixtures are generated locally and contain no private documents.
 

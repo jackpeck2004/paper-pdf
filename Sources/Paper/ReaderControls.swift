@@ -62,6 +62,9 @@ extension EditorController: NSMenuItemValidation {
 
 extension EditorController: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
+        for item in menu.items where item.action == #selector(chooseSidebarMode(_:)) {
+            item.state = item.tag == sidebarMode.rawValue ? .on : .off
+        }
         for item in menu.items where item.action == #selector(setViewMode(_:)) {
             let modes: [PDFDisplayMode] = [.singlePage,.singlePageContinuous,.twoUp,.twoUpContinuous]
             item.state = modes.indices.contains(item.tag) && modes[item.tag] == pdf.displayMode ? .on : .off
