@@ -95,6 +95,8 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         for name in [Notification.Name.PDFViewPageChanged, .PDFViewScaleChanged] {
             observers.append(NotificationCenter.default.addObserver(forName:name,object:pdf,queue:.main) { [weak self] _ in self?.updateStatus() })
         }
+        sidebarScroll.contentView.postsFrameChangedNotifications = true
+        observers.append(NotificationCenter.default.addObserver(forName:NSView.frameDidChangeNotification,object:sidebarScroll.contentView,queue:.main) { [weak self] _ in self?.fitOutlineColumns() })
         observers.append(NotificationCenter.default.addObserver(forName:.PDFThumbnailViewDocumentEdited,object:nil,queue:.main) { [weak self] _ in RunLoop.main.perform(inModes:[.default,.eventTracking]) { self?.commitThumbnailOrder() } })
         do { display(try paper.store.snapshot()) } catch { paper.presentError(error) }
     }
@@ -125,12 +127,18 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         table.allowsMultipleSelection = true; table.allowsEmptySelection = true
         table.target = self; table.doubleAction = #selector(sidebarDoubleClick(_:)); table.setAccessibilityLabel("Document sidebar")
         table.registerForDraggedTypes([.init("org.paperpdf.page"),.fileURL]); table.setDraggingSourceOperationMask(.move,forLocal:true)
-        let column = NSTableColumn(identifier:.init("chapter")); outline.addTableColumn(column); outline.outlineTableColumn = column
+        let column = NSTableColumn(identifier:.init("chapter")); column.minWidth = 70; column.width = 220
+        column.resizingMask = [.autoresizingMask]
+        let pageColumn = NSTableColumn(identifier:.init("page")); pageColumn.width = 46; pageColumn.minWidth = 46; pageColumn.maxWidth = 46; pageColumn.resizingMask = []
+        outline.addTableColumn(column); outline.addTableColumn(pageColumn); outline.outlineTableColumn = column
+        outline.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        outline.autoresizingMask = [.width]; outline.intercellSpacing = NSSize(width:0,height:0)
         outline.headerView = nil; outline.style = .sourceList; outline.backgroundColor = .clear
         outline.indentationPerLevel = 14; outline.rowHeight = 32; outline.delegate = self; outline.dataSource = self
         outline.setAccessibilityLabel("Book chapters")
         sidebarScroll.documentView = table; sidebarScroll.hasVerticalScroller = true; sidebarScroll.drawsBackground = false; sidebarScroll.autohidesScrollers = true
         contentsDescription.font = .systemFont(ofSize:11); contentsDescription.textColor = .secondaryLabelColor
+        contentsDescription.alignment = .left; contentsDescription.setContentHuggingPriority(.defaultLow,for:.horizontal)
         emptyContents.font = .systemFont(ofSize:12); emptyContents.textColor = .secondaryLabelColor; emptyContents.alignment = .center
         thumbnails.pdfView = pdf; thumbnails.backgroundColor = .clear
         thumbnails.maximumNumberOfColumns = 1; thumbnails.thumbnailSize = NSSize(width:140,height:190)
@@ -147,6 +155,7 @@ final class EditorController: NSViewController, NSToolbarDelegate, NSTableViewDa
         emptyContents.translatesAutoresizingMaskIntoConstraints = false; sidebar.addSubview(emptyContents)
         NSLayoutConstraint.activate([
             material.leadingAnchor.constraint(equalTo:sidebar.leadingAnchor),material.trailingAnchor.constraint(equalTo:sidebar.trailingAnchor),material.topAnchor.constraint(equalTo:sidebar.topAnchor),material.bottomAnchor.constraint(equalTo:sidebar.bottomAnchor),
+            contentsDescription.widthAnchor.constraint(equalTo:sidebar.widthAnchor,constant:-20),
             stack.topAnchor.constraint(equalTo:sidebar.topAnchor,constant:12),stack.leadingAnchor.constraint(equalTo:sidebar.leadingAnchor,constant:10),stack.trailingAnchor.constraint(equalTo:sidebar.trailingAnchor,constant:-10),stack.bottomAnchor.constraint(equalTo:sidebar.bottomAnchor),sidebarBody.heightAnchor.constraint(greaterThanOrEqualToConstant:100),
             emptyContents.leadingAnchor.constraint(equalTo:sidebar.leadingAnchor,constant:22),emptyContents.trailingAnchor.constraint(equalTo:sidebar.trailingAnchor,constant:-22),emptyContents.centerYAnchor.constraint(equalTo:sidebar.centerYAnchor)
         ])

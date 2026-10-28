@@ -211,6 +211,35 @@ final class DocumentTests: XCTestCase {
         undo.undo()
         XCTAssertTrue(controller.pdf.document?.page(at:0)?.string?.contains("Chapter 1") == true)
     }
+    func testOutlineUsesFullWidthAndTrailingPageColumn() throws {
+        let document = PaperDocument()
+        try document.read(from:EngineTests.fixture(),ofType:"com.adobe.pdf")
+        document.makeWindowControllers()
+        defer { document.close() }
+        let window = try XCTUnwrap(document.windowControllers.first?.window)
+        let controller = try XCTUnwrap(window.contentViewController as? EditorController)
+        controller.sidebarMode = .outline
+        controller.chapters = [ChapterNode(BookChapter(title:"Wide chapter title that should use all the available sidebar width",page:0,children:[BookChapter(title:"A subsection with a complete title",page:0)]))]
+        controller.chapterRevision = controller.visibleRevision
+        controller.chapterSource = .embedded
+        controller.reloadSidebar()
+        for width in [220.0,320.0] {
+            controller.split.splitView.setPosition(CGFloat(width),ofDividerAt:0)
+            window.contentView?.layoutSubtreeIfNeeded(); controller.fitOutlineColumns()
+            XCTAssertEqual(controller.outline.tableColumns.count,2)
+            let title = controller.outline.tableColumns[0], page = controller.outline.tableColumns[1]
+            XCTAssertEqual(title.width+page.width,controller.sidebarScroll.contentSize.width,accuracy:1)
+            XCTAssertEqual(page.width,CGFloat(46),accuracy:0.5)
+            XCTAssertGreaterThan(title.width,CGFloat(100))
+            XCTAssertEqual(controller.contentsDescription.alignment,.left)
+        }
+        let node = controller.chapters[0]
+        let titleCell = try XCTUnwrap(controller.outlineView(controller.outline,viewFor:controller.outline.tableColumns[0],item:node) as? NSTableCellView)
+        let pageCell = try XCTUnwrap(controller.outlineView(controller.outline,viewFor:controller.outline.tableColumns[1],item:node) as? NSTableCellView)
+        XCTAssertEqual(titleCell.textField?.stringValue,node.chapter.title)
+        XCTAssertEqual(titleCell.toolTip,node.chapter.title)
+        XCTAssertEqual(pageCell.textField?.alignment,.right)
+    }
     func testNativeAtomicSaveAndReopen() throws {
         let document = PaperDocument(), original = EngineTests.fixture()
         try document.read(from:original,ofType:"com.adobe.pdf")

@@ -32,3 +32,9 @@ Not verified: execution on Intel hardware or macOS 14, broad real-world PDF comp
 - Removed the segmented sidebar header in favor of the toolbar's sidebar disclosure menu. Removed the duplicate toolbar page capsule; Go to Page focuses the single footer control.
 - Native page-drag notifications are deferred through the app run loop and translated into serialized MuPDF commands. A regression test posts the native notification and verifies persistence and undo.
 - All 29 engine and native regression checks passed. The release remains ad-hoc signed; notarization and live visual acceptance remain separate release gates.
+
+## Outline column sizing — 28 October 2026
+
+- Replaced the constrained title/page stack with native, separate outline columns: a flexible chapter-title column and a fixed trailing page-number column.
+- Made the title column track the scroll viewport during sidebar resizing, left-aligned the outline caption, and supplied full-title tooltips.
+- All 30 regression checks pass, including explicit column-sizing checks at narrow and wide sidebar widths.

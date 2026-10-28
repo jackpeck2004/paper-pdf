@@ -113,7 +113,7 @@ This is an initial development implementation, not a production-certified Acroba
 
 ## Tests
 
-All 29 regression and native-document checks passed on the development machine. Apple Vision requires an unrestricted local process for its pixel buffers; the sandboxed OCR check failed while the ordinary local run passed.
+All 30 regression and native-document checks passed on the development machine. Apple Vision requires an unrestricted local process for its pixel buffers; the sandboxed OCR check failed while the ordinary local run passed.
 
 The regression suite covers real text replacement and background retention, rollback/stale revisions, annotation persistence, undo snapshots, redaction/non-incremental output, encryption, flattening, page order/extraction, rotated crop geometry, image occurrence removal, form persistence, rejected merges, invisible OCR layers, malformed PDFs, and unsupported text. Test fixtures are generated locally and contain no private documents.
 

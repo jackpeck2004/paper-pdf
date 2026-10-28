@@ -46,6 +46,7 @@ let nativeCases: [(String,() throws -> Void)] = [
     ("responsive layout and native glass",documentTests.testResponsiveLayoutUsesNativeGlass),
     ("Preview sidebar and single page control",documentTests.testPreviewSidebarAndSinglePageControl),
     ("native thumbnail reordering and undo",documentTests.testNativeThumbnailReorderCommitsAndUndoes),
+    ("full-width outline and trailing page numbers",documentTests.testOutlineUsesFullWidthAndTrailingPageColumn),
     ("native atomic save and reopen",documentTests.testNativeAtomicSaveAndReopen)
 ]
 for (name,test) in nativeCases {

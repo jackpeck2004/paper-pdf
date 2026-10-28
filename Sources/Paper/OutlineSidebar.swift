@@ -54,6 +54,7 @@ extension EditorController: NSOutlineViewDataSource, NSOutlineViewDelegate {
         case .headings: contentsDescription.stringValue = "Detected chapter headings"
         case .unavailable: contentsDescription.stringValue = "Contents"
         }
+        fitOutlineColumns()
         outline.reloadData()
         for node in visibleChapters { outline.expandItem(node) }
         emptyContents.isHidden = !visibleChapters.isEmpty || sidebarMode.rawValue != 1
@@ -66,16 +67,33 @@ extension EditorController: NSOutlineViewDataSource, NSOutlineViewDelegate {
         (item as? ChapterNode)?.children[index] ?? visibleChapters[index]
     }
     func outlineView(_ outlineView: NSOutlineView,isItemExpandable item: Any) -> Bool { !((item as? ChapterNode)?.children.isEmpty ?? true) }
+    func fitOutlineColumns() {
+        guard outline.tableColumns.count == 2 else { return }
+        let width = sidebarScroll.contentSize.width
+        guard width > 0 else { return }
+        let titleWidth = max(70,width-outline.tableColumns[1].width)
+        if abs(outline.tableColumns[0].width-titleWidth)>0.5 { outline.tableColumns[0].width = titleWidth }
+        if abs(outline.frame.width-width)>0.5 { outline.setFrameSize(NSSize(width:width,height:outline.frame.height)) }
+    }
     func outlineView(_ outlineView: NSOutlineView,viewFor tableColumn: NSTableColumn?,item: Any) -> NSView? {
         guard let node = item as? ChapterNode else { return nil }
         let cell = NSTableCellView()
-        let title = NSTextField(labelWithString:node.chapter.title); title.font = .systemFont(ofSize:12); title.lineBreakMode = .byTruncatingTail
-        let page = NSTextField(labelWithString:pdf.document?.page(at:node.chapter.page)?.label ?? String(node.chapter.page+1)); page.font = .monospacedDigitSystemFont(ofSize:11,weight:.regular); page.textColor = .secondaryLabelColor
-        page.setContentHuggingPriority(.required,for:.horizontal); page.setContentCompressionResistancePriority(.required,for:.horizontal)
-        let row = NSStackView(views:[title,page]); row.orientation = .horizontal; row.spacing = 10; row.translatesAutoresizingMaskIntoConstraints = false
-        cell.addSubview(row); cell.textField = title
-        NSLayoutConstraint.activate([row.leadingAnchor.constraint(equalTo:cell.leadingAnchor,constant:2),row.trailingAnchor.constraint(equalTo:cell.trailingAnchor,constant:-8),row.centerYAnchor.constraint(equalTo:cell.centerYAnchor)])
-        cell.setAccessibilityLabel(node.chapter.title+", page "+page.stringValue)
+        let isPage = tableColumn?.identifier.rawValue == "page"
+        let value = isPage ? pdf.document?.page(at:node.chapter.page)?.label ?? String(node.chapter.page+1) : node.chapter.title
+        let label = NSTextField(labelWithString:value)
+        label.font = isPage ? .monospacedDigitSystemFont(ofSize:11,weight:.regular) : .systemFont(ofSize:12)
+        label.textColor = isPage ? .secondaryLabelColor : .labelColor
+        label.alignment = isPage ? .right : .left
+        label.lineBreakMode = .byTruncatingTail; label.maximumNumberOfLines = 1
+        label.setContentCompressionResistancePriority(.defaultLow,for:.horizontal)
+        label.translatesAutoresizingMaskIntoConstraints = false; cell.addSubview(label); cell.textField = label
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo:cell.leadingAnchor,constant:isPage ? 0 : 2),
+            label.trailingAnchor.constraint(equalTo:cell.trailingAnchor,constant:isPage ? -8 : -4),
+            label.centerYAnchor.constraint(equalTo:cell.centerYAnchor)
+        ])
+        cell.toolTip = node.chapter.title
+        cell.setAccessibilityLabel(isPage ? "Page "+value : node.chapter.title)
         return cell
     }
     func outlineViewSelectionDidChange(_ notification: Notification) {
