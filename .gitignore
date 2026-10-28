@@ -1,0 +1,8 @@
+.build/
+build/
+Vendor/*
+!Vendor/mupdf/
+!Vendor/DEPENDENCY_REVISIONS.txt
+.DS_Store
+*.xcuserstate
+.homebrew-test/

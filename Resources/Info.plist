@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>Paper</string>
+<key>CFBundleIdentifier</key><string>org.paperpdf.Paper</string>
+<key>CFBundleName</key><string>Paper</string>
+<key>CFBundleDisplayName</key><string>Paper</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>0.2.0</string>
+<key>CFBundleVersion</key><string>3</string>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+<key>NSHighResolutionCapable</key><true/>
+<key>NSSupportsAutomaticTermination</key><true/>
+<key>NSSupportsSuddenTermination</key><true/>
+<key>NSHumanReadableCopyright</key><string>Copyright © 2026 Paper contributors. Paper source: MIT. Includes MuPDF under AGPL v3.</string>
+<key>CFBundleDocumentTypes</key><array><dict>
+<key>CFBundleTypeName</key><string>PDF Document</string>
+<key>CFBundleTypeRole</key><string>Editor</string>
+<key>LSHandlerRank</key><string>Alternate</string>
+<key>LSItemContentTypes</key><array><string>com.adobe.pdf</string></array>
+<key>NSDocumentClass</key><string>Paper.PaperDocument</string>
+</dict></array>
+</dict></plist>

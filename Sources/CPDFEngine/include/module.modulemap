@@ -1,0 +1,4 @@
+module CPDFEngine {
+    header "CPDFEngine.h"
+    export *
+}
